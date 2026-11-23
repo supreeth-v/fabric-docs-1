@@ -4,7 +4,7 @@ description: Learn how to add a Teams activity to a pipeline and use it to send 
 ms.reviewer: xupxhou
 ms.topic: how-to
 ms.custom: pipelines
-ms.date: 08/25/2025
+ms.date: 11/23/2026
 ai-usage: ai-assisted
 ---
 
@@ -58,9 +58,17 @@ Set up the Teams activity by following these steps:
 
    :::image type="content" source="media/teams-activity/select-a-subject.png" alt-text="Screenshot showing the Settings tab of the Teams activity highlighting boxes to add the subject.":::
 
+## Legacy Teams activity
+
+Starting October 30, 2026, you can't add new legacy Teams activities to pipelines. Existing legacy Teams activities can continue to run and be edited. This creation cutoff doesn't require you to migrate existing activities immediately.
+
+If a retirement date for existing legacy activities is finalized, the [lifecycle announcement](https://community.fabric.microsoft.com/blog/fbc_fabricupdatesblogs/upcoming-changes-to-legacy-teams-and-outlook-activities-in-fabric-data-factory-p/5314499) will be updated. Refer to that announcement for changes to the timeline.
+
+For new implementations, use the Teams activity described in this article. Follow the connection and deployment requirements in the following sections when planning a move from the legacy activity.
+
 ## Known limitations
 
-- The Teams activity will be inactive when using CI/CD.
+- The Teams activity will be inactive when using CI/CD. See [CI/CD deployment considerations](#cicd-deployment-considerations) for target-workspace configuration.
 
 ### Connection authentication and ownership
 
@@ -69,14 +77,28 @@ The Microsoft Teams activity uses user-based authentication. Each Teams connecti
 The following considerations apply when configuring Teams connections:
 
 - **User-specific connections:** Each user who wants to run a pipeline that sends Teams messages must create and authenticate their own Teams connection.
-- **Connection sharing:** Teams connections can't be shared across users. Creating a connection by using an administrator account doesn't allow other users to reuse it.
+- **Connection sharing:** Teams connections can't be shared across users or Microsoft Entra security groups. Workspace role assignments and group membership don't grant access to another user's Teams connection. Creating a connection by using an administrator account doesn't allow other users to reuse it.
 - **Workspace configuration:** When deploying pipelines across workspaces, ensure that the appropriate Teams connection is configured and authenticated for the user running the pipeline.
 - **Production environments:** Teams activity requires user authentication and doesn't currently support service principal (SPN) or workspace identity (WI) authentication. Production pipelines that use Teams activity must therefore rely on a user-authenticated connection.
+- **Service accounts:** A service account that signs in as a user still uses user authentication. It doesn't make the connection shareable or enable SPN or WI authentication, and it remains subject to account policies and reauthentication requirements.
 
 > [!NOTE]
 > Teams connections are tied to the authenticated user's identity, regardless of whether the account has administrator privileges. For production scenarios, consider your organization's identity management and governance requirements when determining which account will create and maintain the connection.
 
+### CI/CD deployment considerations
+
+The identity that deploys a pipeline and the identity that authenticates its Teams connection serve different purposes. Support for service principal calls to Fabric APIs doesn't enable service principal authentication to Teams or grant the service principal access to another user's Teams connection. Don't treat pipeline deployment permissions as Teams connection permissions.
+
+For the user-authenticated Teams activity, deployment doesn't remove the target-side authentication requirement. After deploying to another workspace:
+
+1. Open the target pipeline and select the Teams activity.
+1. Create and authenticate the appropriate user connection in the target workspace, and select it for the activity.
+1. Verify the destination team and channel or the group chat, and review the message settings. Ensure the activity is active, save the pipeline, and run it to verify message delivery before enabling production schedules.
+
+This process includes manual user authentication; it isn't a fully unattended, app-only deployment and execution pattern. For the documented OAuth deployment limitations, see [CI/CD for pipelines in Data Factory](cicd-pipelines.md#known-limitations).
+
 ## Related content
 
+- [CI/CD for pipelines in Data Factory](cicd-pipelines.md)
 - [Run, schedule, and trigger pipelines](pipeline-runs.md)
 - [Monitor pipeline runs](monitor-pipeline-runs.md)
