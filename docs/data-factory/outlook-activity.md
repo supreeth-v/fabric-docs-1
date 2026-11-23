@@ -1,9 +1,9 @@
 ---
 title: Office 365 Outlook activity
-description: Learn how to add an Office 365 Outlook activity to a pipeline and use it to send a Teams message.
+description: Learn how to add an Office 365 Outlook activity to a pipeline, configure authentication and connection permissions, and send email.
 ms.reviewer: xupxhou
 ms.topic: how-to
-ms.date: 08/25/2025
+ms.date: 11/23/2026
 ms.custom: pipelines
 ai-usage: ai-assisted
 ---
@@ -48,7 +48,7 @@ To set up the Office 365 Outlook activity:
    > [!NOTE]
    > * If you’re using user authentication and deploying the pipeline with the Outlook or Teams activity to another workspace, the activity will be inactive in the target workspace until you create a new user authentication connection there.
    > * If you don't have access to the connections used in the Outlook activity, the initial deployment will fail. To troubleshoot, you can edit the target pipeline and change the authorization or set the activity to inactive.
-   > * **The content being sent from the email will be sent from your account.**
+   > * With user authentication (OAuth), the connection uses the authenticated user's account to send email. With Workspace Identity (WI) or Service Principal (SPN) authentication, configure the sender mailbox and grant the application identity permission to send from it. The pipeline deployer's account isn't automatically the sender.
 
 1. Provide details for the email, including recipients, subject, and body. You can also add advanced details like a custom "from" address, CC and BCC recipients, sensitivity, and a custom reply-to address. All fields support [dynamic expressions](expression-language.md).
 
@@ -58,9 +58,9 @@ To set up the Office 365 Outlook activity:
 
 The **Office 365 Email activity** enables pipelines to send notifications and automated messages using an authenticated connection.
 
-In collaborative development scenarios, teams may need to reuse email logic across multiple pipelines and users. However, email connections are currently scoped to individual users and are not designed for direct sharing across authors.
+In collaborative development scenarios, teams might need to reuse email logic across multiple pipelines and users. Outlook connections that use **user authentication (OAuth)** are user-specific and can't be shared directly with other authors or a deployment service principal. This restriction doesn't describe all Outlook authentication methods. For WI connection access and automated deployment, see [Connection ownership and deployment permissions](#connection-ownership-and-deployment-permissions).
 
-To support reuse and consistency, you can adopt a pipeline-based composition pattern that centralizes email functionality. Instead of duplicating email configuration across pipelines, create a **dedicated pipeline responsible for sending emails**, and invoke it from other pipelines.
+To support reuse and consistency, you can adopt a pipeline-based composition pattern that centralizes email functionality. Instead of duplicating email configuration across pipelines, create a **dedicated pipeline responsible for sending emails**, and invoke it from other pipelines. In this pattern, you share the pipeline invocation connection, not the underlying user-OAuth Outlook connection.
 
 1. Create a reusable email pipeline
 
@@ -106,20 +106,46 @@ To support reuse and consistency, you can adopt a pipeline-based composition pat
 
 ### Authentication support
 
-The Office 365 Outlook activity supports the following authentication methods:
+The Office 365 Outlook activity supports the following authentication methods. Authentication to Outlook is separate from permission to manage or use the Fabric connection.
 
-- User Authentication (OAuth)
-- Workspace Identity (WI)
-- Service Principal (SPN)
+| Authentication method | Connection and automation considerations |
+| --- | --- |
+| User authentication (OAuth) | Uses a user's credentials. The Outlook connection is user-specific and isn't directly shareable. Review the [user-authentication deployment limitations](cicd-pipelines.md#known-limitations) when moving pipelines between environments. |
+| Workspace Identity (WI) | Uses a Fabric workspace identity to authenticate to Outlook. A deployment SPN can use a WI connection with the appropriate connection permissions; the SPN doesn't have to own the connection. |
+| Service Principal (SPN) | Uses the application identity configured in the Outlook connection. Using SPN credentials for Outlook doesn't automatically grant that application or the deployment identity access to the Fabric connection. |
 
 By using Workspace Identity and Service Principal support, your organization can run email notifications by using non-user identities. This approach helps reduce dependency on individual user accounts and supports production-grade automation scenarios.
 
-When you use Workspace Identity or Service Principal authentication, you need to configure the appropriate Microsoft Entra ID and Microsoft Graph permissions to send email on behalf of the desired mailbox. Depending on your organizational requirements, you might also need to set up additional Exchange Online mailbox restrictions and governance policies.
+### Connection ownership and deployment permissions
+
+The following identities and permissions have different purposes:
+
+| Identity or permission | Purpose |
+| --- | --- |
+| Deployment identity | Calls Fabric APIs to create or update the pipeline. It needs the applicable workspace or item permissions and access to the referenced connections. |
+| Connection Owner | Manages the Fabric connection and its permissions. Ownership doesn't determine the authentication method used to access Outlook. |
+| Connection User | Can use the connection without owning it. **User** is a connection permission role, not user authentication; a service principal can receive this role on a shareable connection. |
+| Outlook authentication identity | Authenticates to Outlook using the credentials configured in the connection: user OAuth, WI, or SPN. |
+
+Workspace permissions alone don't grant access to a referenced connection. For REST deployment with a WI-authenticated Outlook connection, you can use either of these arrangements:
+
+- A user creates and owns the WI connection, then grants the deployment SPN the connection **User** role. The user remains the Owner.
+- The deployment SPN creates and owns the WI connection, then deploys the pipeline that references it. No separate sharing grant to that SPN is needed.
+
+Both arrangements use **WI authentication to Outlook**. Creating a connection as an SPN doesn't change its credentials to SPN authentication. Neither arrangement makes a user-OAuth Outlook connection shareable.
+
+For role assignments, see [Add Connection Role Assignment](/rest/api/fabric/core/connections/add-connection-role-assignment). If the deployment SPN creates the connection, a Fabric administrator must also allow it under [Service principals can create workspaces, connections, and deployment pipelines](../admin/service-admin-portal-developer.md#service-principals-can-create-workspaces-connections-and-deployment-pipelines). This setting is separate from the setting that allows service principals to call Fabric public APIs.
+
+### Mailbox permissions and sender
+
+Fabric API access, connection access, and authorization to send email are separate prerequisites. When you use WI or SPN authentication, configure the appropriate Microsoft Entra ID and Microsoft Graph application permissions, obtain administrator consent, and specify a mailbox that the identity is authorized to send from. The sender mailbox must be available in Exchange Online and support the required mail API operations. Depending on your organizational requirements, you might also need to set up additional Exchange Online mailbox restrictions and governance policies.
 
    > [!NOTE]
    > Service Principal (SPN) and Workspace Identity (WI) use application-level Microsoft Graph permissions to access Outlook. A tenant administrator must explicitly grant the required permissions and provide admin consent before the identity can be used. These permissions can allow the identity to send email on behalf of users in the tenant. Before granting access, tenant administrators should review the permission scope and ensure it aligns with their organization's security policies.
 
 For more information about setting up WI or SPN, see [Workspace identity support in Data Factory](workspace-identity.md) or [Service principal support in Data Factory](service-principals.md).
+
+Successful deployment or connection access doesn't by itself verify email delivery. Run the activity and verify delivery to the intended recipients after configuring the mailbox and permissions.
 
 ## Known limitations
 
