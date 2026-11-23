@@ -242,6 +242,14 @@ Consider using batch APIs when:
 > [!NOTE]
 > These APIs are in preview. Use them judiciously alongside deployment pipelines, and review the [Fabric REST API documentation](/rest/api/fabric/) for current limits and authentication requirements.
 
+## Connection permissions for automated deployment
+
+The identity that deploys a pipeline, the owner of its Fabric connections, and the identities configured to authenticate to external services can be different. Workspace or item permissions don't automatically grant the deployment identity access to referenced connections.
+
+For REST deployment of an Outlook activity using a shareable WI-authenticated connection, the deployment SPN can have the connection **User** role while a user remains the Owner, or the SPN can create and own the connection. In either case, Outlook authentication remains WI-based. These arrangements don't make a user-OAuth Outlook connection shareable or remove its manual authentication requirements.
+
+For connection roles, SPN connection-creation prerequisites, and separate mailbox permissions, see [Outlook connection ownership and deployment permissions](outlook-activity.md#connection-ownership-and-deployment-permissions).
+
 ## Known limitations
 
 The following known limitations apply to CI/CD for pipelines in Data Factory:
